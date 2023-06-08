@@ -339,18 +339,33 @@ class MobileScannerController {
         break;
       case 'barcode':
         if (data == null) return;
-        final parsed = (data as List)
-            .map((value) => Barcode.fromNative(value as Map))
-            .toList();
-        _barcodesController.add(
-          BarcodeCapture(
-            raw: data,
-            barcodes: parsed,
-            image: event['image'] as Uint8List?,
-            width: event['width'] as double?,
-            height: event['height'] as double?,
-          ),
-        );
+        final dataList = data as List;
+        if (dataList.first is String) {
+          _barcodesController.add(
+            BarcodeCapture(
+              raw: data,
+              barcodes: dataList
+                  .map((value) => Barcode(rawValue: value as String))
+                  .toList(),
+              image: event['image'] as Uint8List?,
+              width: event['width'] as double?,
+              height: event['height'] as double?,
+            ),
+          );
+        } else {
+          final parsed = dataList
+              .map((value) => Barcode.fromNative(value as Map))
+              .toList();
+          _barcodesController.add(
+            BarcodeCapture(
+              raw: data,
+              barcodes: parsed,
+              image: event['image'] as Uint8List?,
+              width: event['width'] as double?,
+              height: event['height'] as double?,
+            ),
+          );
+        }
         break;
       case 'barcodeMac':
         _barcodesController.add(

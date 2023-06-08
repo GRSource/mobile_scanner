@@ -8,10 +8,8 @@
 import Foundation
 
 import AVFoundation
-import MLKitVision
-import MLKitBarcodeScanning
 
-typealias MobileScannerCallback = ((Array<Barcode>?, Error?, UIImage) -> ())
+typealias MobileScannerCallback = (([String], UIImage) -> ())
 typealias TorchModeChangeCallback = ((Int?) -> ())
 
 public class MobileScanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, FlutterTexture {
@@ -20,9 +18,6 @@ public class MobileScanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelega
 
     /// The selected camera
     var device: AVCaptureDevice!
-
-    /// Barcode scanner for results
-    var scanner = BarcodeScanner.barcodeScanner()
 
     /// Return image buffer with the Barcode event
     var returnImage: Bool = false
@@ -82,42 +77,50 @@ public class MobileScanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelega
         registry?.textureFrameAvailable(textureId)
         if ((detectionSpeed == DetectionSpeed.normal || detectionSpeed == DetectionSpeed.noDuplicates) && i > 10 || detectionSpeed == DetectionSpeed.unrestricted) {
             i = 0
-            let ciImage = latestBuffer.image
+            let image = latestBuffer.image
+            if let cgImage = image.cgImage {
+                let ciImage = CIImage(cgImage: cgImage)
+                let options = [CIDetectorAccuracy: CIDetectorAccuracyHigh]
+                let detector = CIDetector(ofType: CIDetectorTypeQRCode, context: nil, options: options)
+                if let features = detector?.features(in: ciImage) {
+                    let messageStrings = features.filter { $0.isKind(of: CIQRCodeFeature.self) }.compactMap { ($0 as! CIQRCodeFeature).messageString }
 
-            let image = VisionImage(image: ciImage)
-            image.orientation = imageOrientation(
-                deviceOrientation: UIDevice.current.orientation,
-                defaultOrientation: .portrait,
-                position: videoPosition
-            )
-
-            scanner.process(image) { [self] barcodes, error in
-                if (detectionSpeed == DetectionSpeed.noDuplicates) {
-                    let newScannedBarcodes = barcodes?.map { barcode in
-                        return barcode.rawValue
-                    }
-                    if (error == nil && barcodesString != nil && newScannedBarcodes != nil && barcodesString!.elementsEqual(newScannedBarcodes!)) {
-                        return
-                    } else {
-                        barcodesString = newScannedBarcodes
-                    }
+                    mobileScannerCallback(messageStrings, image)
                 }
-
-                mobileScannerCallback(barcodes, error, ciImage)
             }
+//            let image = VisionImage(image: ciImage)
+//            image.orientation = imageOrientation(
+//                deviceOrientation: UIDevice.current.orientation,
+//                defaultOrientation: .portrait,
+//                position: videoPosition
+//            )
+//
+//            scanner.process(image) { [self] barcodes, error in
+//                if (detectionSpeed == DetectionSpeed.noDuplicates) {
+//                    let newScannedBarcodes = barcodes?.map { barcode in
+//                        return barcode.rawValue
+//                    }
+//                    if (error == nil && barcodesString != nil && newScannedBarcodes != nil && barcodesString!.elementsEqual(newScannedBarcodes!)) {
+//                        return
+//                    } else {
+//                        barcodesString = newScannedBarcodes
+//                    }
+//                }
+//
+//                mobileScannerCallback(barcodes, error, ciImage)
+//            }
         } else {
             i+=1
         }
     }
 
     /// Start scanning for barcodes
-    func start(barcodeScannerOptions: BarcodeScannerOptions?, returnImage: Bool, cameraPosition: AVCaptureDevice.Position, torch: AVCaptureDevice.TorchMode, detectionSpeed: DetectionSpeed) throws -> MobileScannerStartParameters {
+    func start(returnImage: Bool, cameraPosition: AVCaptureDevice.Position, torch: AVCaptureDevice.TorchMode, detectionSpeed: DetectionSpeed) throws -> MobileScannerStartParameters {
         self.detectionSpeed = detectionSpeed
         if (device != nil) {
             throw MobileScannerError.alreadyStarted
         }
 
-        scanner = barcodeScannerOptions != nil ? BarcodeScanner.barcodeScanner(options: barcodeScannerOptions!) : BarcodeScanner.barcodeScanner()
         captureSession = AVCaptureSession()
         textureId = registry?.register(self)
 
@@ -258,18 +261,6 @@ public class MobileScanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelega
             throw MobileScannerError.zoomError(error)
         }
         
-    }
-
-    /// Analyze a single image
-    func analyzeImage(image: UIImage, position: AVCaptureDevice.Position, callback: @escaping BarcodeScanningCallback) {
-        let image = VisionImage(image: image)
-        image.orientation = imageOrientation(
-            deviceOrientation: UIDevice.current.orientation,
-            defaultOrientation: .portrait,
-            position: position
-        )
-
-        scanner.process(image, completion: callback)
     }
 
     var i = 0
