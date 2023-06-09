@@ -118,7 +118,8 @@ public class MobileScanner: NSObject, AVCaptureVideoDataOutputSampleBufferDelega
     func start(returnImage: Bool, cameraPosition: AVCaptureDevice.Position, torch: AVCaptureDevice.TorchMode, detectionSpeed: DetectionSpeed) throws -> MobileScannerStartParameters {
         self.detectionSpeed = detectionSpeed
         if (device != nil) {
-            throw MobileScannerError.alreadyStarted
+            let dimensions = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
+            return MobileScannerStartParameters(width: Double(dimensions.height), height: Double(dimensions.width), hasTorch: device.hasTorch, textureId: textureId)
         }
 
         captureSession = AVCaptureSession()
