@@ -10,6 +10,7 @@ import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
@@ -31,7 +32,8 @@ class MobileScanner(
     private var camera: Camera? = null
     private var preview: Preview? = null
     private var textureEntry: TextureRegistry.SurfaceTextureEntry? = null
-    private var scanner = BarcodeScanning.getClient()
+    //    private var scanner = BarcodeScanning.getClient()
+    private var scanner: BarcodeScanner? = null
     private var lastScanned: List<String?>? = null
     private var scannerTimeout = false
 
@@ -56,7 +58,10 @@ class MobileScanner(
             scannerTimeout = true
         }
 
-        scanner.process(inputImage)
+        if (scanner == null) {
+            scanner = BarcodeScanning.getClient()
+        }
+        scanner!!.process(inputImage)
             .addOnSuccessListener { barcodes ->
                 if (detectionSpeed == DetectionSpeed.NO_DUPLICATES) {
                     val newScannedBarcodes = barcodes.map { barcode -> barcode.rawValue }
@@ -257,7 +262,10 @@ class MobileScanner(
     fun analyzeImage(image: Uri, analyzerCallback: AnalyzerCallback) {
         val inputImage = InputImage.fromFilePath(activity, image)
 
-        scanner.process(inputImage)
+        if (scanner == null) {
+            scanner = BarcodeScanning.getClient()
+        }
+        scanner!!.process(inputImage)
             .addOnSuccessListener { barcodes ->
                 val barcodeMap = barcodes.map { barcode -> barcode.data }
 
